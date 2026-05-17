@@ -101,6 +101,7 @@ def _(
     mo,
     parametri_input,
     sm,
+    t,
     vlatex,
 ):
     # --- CELLA 3: LOGICA DI PARSING DEI SIMBOLI ---
@@ -113,9 +114,9 @@ def _(
     ]
 
     simboli_fisici = {s: sm.Symbol(s, real=True, positive=True) for s in nomi_parametri}
-    simboli_lagrange = {s: dynamicsymbols(s) for s in nomi_coordinate}
+    simboli_lagrange = {s: dynamicsymbols(s, real=True) for s in nomi_coordinate}
     q = Matrix([x for x in simboli_lagrange.values()])
-    qd = Matrix([dynamicsymbols(x, 1) for x in simboli_lagrange.keys()])
+    qd = Matrix([x.diff(t) for x in q])
 
     # Uniamo tutto in un dizionario per sympy.parse_expr
     # Includiamo anche funzioni standard come sin, cos, ecc.
@@ -521,7 +522,7 @@ def _(elastic, mo, n_springs, punti, simplify, tabella_indici):
             mo.hstack(
                 [
                     mo.md(
-                        rf"$OP_{{{x[0]}}} \leftrightarrow OP_{{{x[1]}}}$"
+                        rf"$OP_{{{x[0]+1}}} \leftrightarrow OP_{{{x[1]+1}}}$"
                     ).center()
                     for x in springs
                 ]
@@ -560,8 +561,14 @@ def _(Matrix, V_centr, V_elast, V_gravi, mo, q, simplify):
 @app.cell
 def _(V_grad, q, sm):
     # This cell makes the heavy lift, do not re-run if unnecessary
-    equilibria = sm.solve(list(V_grad), list(q))
+    equilibria = sm.nonlinsolve(list(V_grad), list(q))
     return (equilibria,)
+
+
+@app.cell
+def _(equilibria):
+    equilibria
+    return
 
 
 @app.cell(hide_code=True)
@@ -584,7 +591,7 @@ def _(V_grad, equilibria, mo, q, simplify, vlatex):
             if H.is_positive_definite:
                 hess_sign = "<"
 
-        eq_md_table += f"""|**{je}**|${vlatex(eq)}$|${hess_sign}$|${vlatex(H.det())}$|${vlatex(H.trace())}$|\n"""
+        eq_md_table += f"""|**{je}**|${vlatex(eq)}$|${hess_sign}$|${vlatex(simplify(H.det()))}$|${vlatex(simplify(H.trace()))}$|\n"""
 
     # Visualizzazione (sarà una classica tabella HTML pulita)
     mo.vstack([mo.md("### Equilibria"), mo.md(eq_md_table)])
@@ -683,7 +690,7 @@ def _(K, Matrix, V_tot, mo, q, qd, simplify, t, vlatex):
                     mo.vstack(
                         [
                             mo.hstack([
-                                mo.md(rf""" \[\dot{{q}}_{i} =  {vlatex(lq)}\]"""),
+                                mo.md(rf""" \[\dot{{q}}_{i} =  {vlatex(qd[i])}\]"""),
                                 mo.md(rf""" \[{vlatex(ML_dq[i])}\]""").center()])
                             for i, lq in enumerate(q)
                         ]
@@ -699,7 +706,7 @@ def _(K, Matrix, V_tot, mo, q, qd, simplify, t, vlatex):
                         [
                             mo.hstack(
                                 [
-                                    mo.md(rf""" \[\dot{{q}}_{i} =  {vlatex(lq)}\]"""),
+                                    mo.md(rf""" \[\dot{{q}}_{i} =  {vlatex(qd[i])}\]"""),
                                     mo.md(
                                         rf""" \[{vlatex(ML_dq[i].diff(t))}\]"""
                                     ).center(),
